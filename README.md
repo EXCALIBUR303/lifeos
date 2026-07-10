@@ -2,6 +2,9 @@
 
 **Your life, beautifully organized.** One intelligent home for tasks, habits, money, goals, health, journaling and deep-work focus — instead of five different apps.
 
+**Live app:** https://lifeos-eta-woad.vercel.app · **Repo:** https://github.com/EXCALIBUR303/lifeos
+Redeploy after changes with `npx vercel --prod`. All personal data stays in each device's browser — the site only serves the app shell.
+
 Local-first: everything lives in your browser's localStorage. No account, no cloud, no tracking.
 
 ## Run it
