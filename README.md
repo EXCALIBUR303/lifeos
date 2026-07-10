@@ -1,36 +1,106 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LifeOS
 
-## Getting Started
+**Your life, beautifully organized.** One intelligent home for tasks, habits, money, goals, health, journaling and deep-work focus — instead of five different apps.
 
-First, run the development server:
+Local-first: everything lives in your browser's localStorage. No account, no cloud, no tracking.
+
+## Run it
 
 ```bash
+cd ~/Claude/lifeos
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then open **http://localhost:3000** in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+For the full app experience (offline support + installability): `npm run build && npm start`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Install as an app (PWA)
 
-## Learn More
+LifeOS ships a manifest, app icons and a service worker — after the first visit it
+works offline and installs like a native app:
 
-To learn more about Next.js, take a look at the following resources:
+- **Mac (Safari):** open the app → File → **Add to Dock**
+- **Mac (Chrome/Edge):** click the install icon in the address bar
+- **iPhone/iPad (Safari):** Share → **Add to Home Screen** — full-screen, home-screen icon, safe-area aware
+- **iPhone on your home Wi-Fi:** run `npm run build && npm start` on the Mac, then open the
+  `Network:` URL that Next prints (e.g. `http://192.168.x.x:3000`) in iPhone Safari
+- **From anywhere (recommended):** deploy free to Vercel, then install from the HTTPS URL:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+  ```bash
+  cd ~/Claude/lifeos
+  npx vercel login
+  npx vercel --prod
+  ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+  (Press Enter to accept every default. Offline mode + Add to Home Screen work fully over HTTPS.)
 
-## Deploy on Vercel
+## What's inside
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Module | Highlights |
+|---|---|
+| **Dashboard** | Life Score ring, AI daily briefing, insight cards, life-balance radar, live widgets for every module |
+| **Tasks** | Natural-language quick add (“submit report next friday at 9pm urgent #college”), list + kanban board with drag & drop |
+| **Habits** | Streaks, 18-week heatmap, per-day week toggles, perfect-day stats, custom habits (icon/color/cadence) |
+| **Money** | ₹ INR budgets with over-spend meters, category donut, 30-day trend, 6-month bars, recurring bills, income/savings rate |
+| **Goals** | Short-term / long-term / dream board, milestone checklists, **deadline forecast** (on track / at risk) from milestone velocity |
+| **Journal** | Mood picker, gratitude chips, 30-day mood trend, full-text search |
+| **Health** | Water / sleep / steps / workout rings, 1-tap loggers, sleep-vs-workout **correlation insight**, 14-day charts |
+| **Focus** | 25/50/90-min pomodoro with animated ring, session labels, auto-logging, celebration burst, weekly stats |
+| **Calendar** | Month + week time-grid, color-coded recurring classes/events, **exam mode** with countdowns, **.ics import/export** |
+| **Study** | Subjects with credits → live **CGPA**, attendance with "safe to skip N classes" math, exam countdowns, **spaced-repetition flashcards** |
+| **Notes** | Markdown-lite editor with **[[wiki links]]**, automatic backlinks, pinning, full-text search |
+| **Assistant** | Chat grounded in your data — **Claude or Gemini** (your own key, browser-direct) with an honest on-device fallback engine |
+| **Recap (Life Replay)** | Any month retold as numbered story headlines + a stat mosaic (deep work, habits, money, sleep, steps, mood) |
+| **Settings** | Dark / Light / OLED themes, 4 accent colors, Anthropic API key, JSON export, demo-data reset |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+System-wide: **⌘K command palette** (navigate, quick-add tasks in natural language, log water, switch themes), aurora glass design, staggered entrance animations, mobile bottom nav, `prefers-reduced-motion` support.
+
+## The intelligence layer
+
+`src/lib/insights.ts` is a rule-based, on-device engine (no API calls — swappable for an LLM later):
+
+- **Life Score** — 8-axis weighted score (health, fitness, mindfulness, productivity, money, learning, career, relationships) feeding the radar chart
+- **Unusual spending** — current month vs 3-month category average
+- **Habit risk** — recent completion collapse vs baseline
+- **Burnout watch** — low sleep + high focus load
+- **Budget pace, savings rate, streak wins, deep-work weekday, journaling nudges**
+
+## Architecture
+
+```
+src/
+  app/            one route per module (all client components, statically prerendered)
+  components/
+    shell.tsx     grouped sidebar / topbar / splash / ⌘K palette
+    charts.tsx    hand-rolled SVG charts (area, bars, donut, heatmap, radar, sparkline)
+    ui.tsx        glass cards, rings, meters, buttons, motion presets
+  lib/
+    types.ts      domain models
+    store.ts      Zustand stores persisted to localStorage
+    seed.ts       deterministic demo-data generator (~200 days)
+    insights.ts   Life Score + insight detectors + daily briefing
+    nlp.ts        natural-language task parser
+    calendar.ts   recurrence expansion + .ics import/export
+    assistant.ts  data digest, Claude API client, on-device fallback
+```
+
+- **Stack:** Next.js 16 (App Router, Turbopack), React 19, TypeScript, Tailwind v4, Framer Motion, Zustand, Lucide icons
+- **Theming:** CSS custom properties on `<html data-theme>`; chart palettes validated for colorblind-safe contrast in both modes
+- **State:** Zustand + `persist` → localStorage key `lifeos-data` (settings under `lifeos-settings`); export/reset in Settings
+
+## The AI assistant
+
+Three modes, chosen in Settings → AI (keys live only in your browser and are sent
+straight from your device to the provider — no middleman server):
+
+- **Claude** — official `@anthropic-ai/sdk` in the browser (`dangerouslyAllowBrowser`), model `claude-opus-4-8`, adaptive thinking. Key from console.anthropic.com (pay-as-you-go — **separate from a Claude Pro subscription**).
+- **Gemini** — REST call to `gemini-2.5-flash`. Key from **aistudio.google.com — free tier**, separate from a Gemini Pro subscription.
+- **On-device** — a transparent rules engine answers about money, habits, sleep, plans and burnout with zero network. Runs whenever no key is set, and is clearly labeled.
+
+## Roadmap (requires accounts/native apps — not buildable client-side)
+
+- Supabase backend + auth (Google/Apple/passkeys) with cross-device sync — needs a provisioned backend project and OAuth app registrations
+- Google/Apple/Outlook **two-way** calendar sync — needs OAuth client IDs and consent screens (one-way `.ics` import/export ships today)
+- Apple Health / Google Fit / Health Connect — need native mobile apps, not reachable from a web page
+- Receipt-scanning OCR, push notifications, Memory Vault media storage
