@@ -3,7 +3,28 @@
 **Your life, beautifully organized.** One intelligent home for tasks, habits, money, goals, health, journaling and deep-work focus — instead of five different apps.
 
 **Live app:** https://lifeos-eta-woad.vercel.app · **Repo:** https://github.com/EXCALIBUR303/lifeos
-Redeploy after changes with `npx vercel --prod`. All personal data stays in each device's browser — the site only serves the app shell.
+Redeploy after changes with `npx vercel --prod`.
+
+## Cross-device sync (E2E encrypted)
+
+Settings → **Sync between devices** → Create sync code on device 1, Join with the same
+code on device 2. Everything (tasks, money, habits, calendar, notes…) stays in sync:
+changes push automatically a few seconds after you make them and pull on app open/focus.
+
+Privacy model: the AES-256 key is derived from your code with PBKDF2 and never leaves
+your devices; the server (a free Supabase project, `ap-south-1`) stores only ciphertext
+under a hashed id, behind RLS-sealed tables reachable only through exact-id RPCs.
+Conflicts resolve newest-write-wins. Chat history and API keys deliberately never sync.
+
+## iPhone / Mac Calendar sync
+
+Calendar page → toggle **iPhone & Mac Calendar sync** → copy the `webcal://` link:
+- iPhone: open the link in Safari → Subscribe (or Settings → Apps → Calendar → Add Subscribed Calendar)
+- Mac: Calendar → File → New Calendar Subscription
+
+Import a timetable (or add/edit any event) and the feed republishes automatically;
+Apple refreshes it on the schedule you pick when subscribing (choose hourly). The feed
+shares event titles/times only, on an unguessable URL, and can be switched off anytime.
 
 Local-first: everything lives in your browser's localStorage. No account, no cloud, no tracking.
 
