@@ -10,9 +10,19 @@ import {
   stagger,
 } from "@/components/ui";
 import { AccentId, ThemeMode, useLife, useSettings } from "@/lib/store";
+import { clearSyncMeta, genSyncCode, normalizeCode, useSyncStatus } from "@/lib/sync";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { Check, Download, Moon, MoonStar, RotateCcw, Sun } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Download,
+  Moon,
+  MoonStar,
+  RefreshCw,
+  RotateCcw,
+  Sun,
+} from "lucide-react";
 import { useState } from "react";
 
 const THEMES: { id: ThemeMode; label: string; blurb: string; icon: React.ReactNode; swatch: string }[] = [
@@ -32,9 +42,13 @@ export default function SettingsPage() {
   const {
     name, setName, theme, setTheme, accent, setAccent,
     apiKey, setApiKey, geminiKey, setGeminiKey, provider, setProvider,
+    syncCode, setSyncCode,
   } = useSettings();
   const life = useLife();
+  const syncStatus = useSyncStatus();
   const [confirmReset, setConfirmReset] = useState(false);
+  const [joinCode, setJoinCode] = useState("");
+  const [copied, setCopied] = useState(false);
 
   const exportData = () => {
     const payload = {
@@ -81,6 +95,110 @@ export default function SettingsPage() {
             onChange={(e) => setName(e.target.value)}
             className={cn(inputCls, "max-w-xs")}
           />
+        </GlassCard>
+
+        {/* sync */}
+        <GlassCard className="p-5">
+          <SectionTitle>Sync between devices</SectionTitle>
+          {!syncCode ? (
+            <>
+              <p className="mb-4 text-sm leading-relaxed text-ink-3">
+                Pair your Mac and iPhone with one code. Data is end-to-end encrypted —
+                the server only ever sees ciphertext, and only devices with the code can
+                read it. Newest change wins when both devices edit offline.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Btn
+                  onClick={() => {
+                    clearSyncMeta();
+                    setSyncCode(genSyncCode());
+                  }}
+                >
+                  <RefreshCw className="size-4" aria-hidden /> Create sync code
+                </Btn>
+                <span className="text-xs text-ink-3">or join with an existing code:</span>
+              </div>
+              <div className="mt-3 flex max-w-md gap-2">
+                <input
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value)}
+                  placeholder="XXXXX-XXXXX-XXXXX-XXXXX"
+                  className={cn(inputCls, "font-mono uppercase")}
+                  aria-label="Existing sync code"
+                />
+                <Btn
+                  variant="soft"
+                  disabled={normalizeCode(joinCode).length < 16}
+                  onClick={() => {
+                    clearSyncMeta();
+                    setSyncCode(joinCode);
+                    setJoinCode("");
+                  }}
+                >
+                  Join
+                </Btn>
+              </div>
+              <p className="mt-2 text-xs text-warn">
+                Joining pulls the synced copy — it will replace this device&apos;s data
+                if the other device has already pushed.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="mb-2 text-xs font-medium text-ink-2">
+                Your sync code — enter it on your other device (Settings → Sync → Join)
+              </p>
+              <div className="flex max-w-md items-center gap-2">
+                <code className="flex-1 rounded-xl border border-line bg-card px-3 py-2 font-mono text-sm tracking-wider text-ink">
+                  {syncCode}
+                </code>
+                <Btn
+                  variant="ghost"
+                  onClick={() => {
+                    navigator.clipboard.writeText(syncCode);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1600);
+                  }}
+                >
+                  <Copy className="size-4" aria-hidden /> {copied ? "Copied!" : "Copy"}
+                </Btn>
+              </div>
+              <p
+                className={cn(
+                  "mt-3 flex items-center gap-1.5 text-xs",
+                  syncStatus.state === "error" ? "text-bad" : syncStatus.state === "ok" ? "text-good" : "text-ink-3",
+                )}
+              >
+                <span
+                  className={cn(
+                    "size-1.5 rounded-full",
+                    syncStatus.state === "error" ? "bg-bad" : syncStatus.state === "ok" ? "bg-good" : "bg-warn animate-pulse",
+                  )}
+                  aria-hidden
+                />
+                {syncStatus.detail}
+                {syncStatus.at && ` · ${new Date(syncStatus.at).toLocaleTimeString()}`}
+              </p>
+              <div className="mt-3 flex gap-2">
+                <Btn variant="soft" onClick={() => window.dispatchEvent(new Event("lifeos-sync-now"))}>
+                  <RefreshCw className="size-4" aria-hidden /> Sync now
+                </Btn>
+                <Btn
+                  variant="ghost"
+                  onClick={() => {
+                    setSyncCode("");
+                    clearSyncMeta();
+                  }}
+                >
+                  Stop syncing
+                </Btn>
+              </div>
+              <p className="mt-3 text-xs text-ink-3">
+                Treat the code like a password — anyone who has it can read and change
+                this data.
+              </p>
+            </>
+          )}
         </GlassCard>
 
         {/* theme */}

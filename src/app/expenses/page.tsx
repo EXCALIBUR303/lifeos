@@ -9,6 +9,7 @@ import {
   PageHeader,
   SectionTitle,
   StatTile,
+  fadeUp,
   inputCls,
   stagger,
 } from "@/components/ui";
@@ -28,15 +29,39 @@ import {
   todayISO,
 } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowDownLeft, ArrowUpRight, Plus, Trash2, X } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Plus, Search, Trash2, X } from "lucide-react";
 import { useState } from "react";
 
 const SERIES = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)"];
 
+const QUICK_CATS: CategoryId[] = [
+  "food", "groceries", "transport", "shopping", "entertainment", "health",
+  "education", "travel", "bills", "subscriptions", "rent", "other",
+];
+
 export default function ExpensesPage() {
   const { transactions, budgets, addTransaction, deleteTransaction } = useLife();
   const [adding, setAdding] = useState(false);
+  const [quickAmount, setQuickAmount] = useState("");
+  const [quickNote, setQuickNote] = useState("");
+  const [quickCat, setQuickCat] = useState<CategoryId>("food");
+  const [filterCat, setFilterCat] = useState<CategoryId | null>(null);
+  const [search, setSearch] = useState("");
   const today = todayISO();
+
+  const quickAdd = () => {
+    const amt = parseFloat(quickAmount);
+    if (!amt || amt <= 0) return;
+    addTransaction({
+      date: today,
+      amount: amt,
+      kind: "expense",
+      category: quickCat,
+      note: quickNote.trim() || CATEGORY_META[quickCat].label,
+    });
+    setQuickAmount("");
+    setQuickNote("");
+  };
   const mk = monthKey(today);
   const prevMk = prevMonthKeys(1)[0];
 
@@ -79,14 +104,24 @@ export default function ExpensesPage() {
     value: sum(transactions.filter((t) => t.kind === "expense" && t.date === d).map((t) => t.amount)),
   }));
 
-  /* grouped recent transactions */
+  /* grouped transactions — filterable by category + free-text search */
+  const filtering = filterCat !== null || search.trim() !== "";
+  const needle = search.trim().toLowerCase();
+  const visibleTx = [...transactions]
+    .sort((a, b) => (a.date > b.date ? -1 : 1))
+    .filter((t) => !filterCat || t.category === filterCat)
+    .filter((t) => !needle || t.note.toLowerCase().includes(needle))
+    .slice(0, filtering ? 200 : 24);
   const groups = new Map<string, typeof transactions>();
-  for (const t of [...transactions].sort((a, b) => (a.date > b.date ? -1 : 1)).slice(0, 24)) {
+  for (const t of visibleTx) {
     const g = groups.get(t.date) ?? [];
     g.push(t);
     groups.set(t.date, g);
   }
   const recent = [...groups.entries()];
+  const filteredTotal = sum(
+    visibleTx.filter((t) => t.kind === "expense").map((t) => t.amount),
+  );
 
   const budgetRows = (Object.entries(budgets) as [CategoryId, number][]).sort(
     (a, b) => monthSpend(transactions, mk, b[0]) / b[1] - monthSpend(transactions, mk, a[0]) / a[1],
@@ -105,6 +140,47 @@ export default function ExpensesPage() {
           </Btn>
         }
       />
+
+      {/* quick expense entry */}
+      <motion.div variants={fadeUp} className="glass mb-6 rounded-2xl p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1 rounded-xl border border-line bg-card px-3 py-2">
+            <span className="text-sm text-ink-3">₹</span>
+            <input
+              value={quickAmount}
+              onChange={(e) => setQuickAmount(e.target.value.replace(/[^\d.]/g, ""))}
+              onKeyDown={(e) => e.key === "Enter" && quickAdd()}
+              inputMode="decimal"
+              placeholder="250"
+              className="w-24 bg-transparent text-sm font-semibold text-ink outline-none placeholder:font-normal placeholder:text-ink-3"
+              aria-label="Amount spent"
+            />
+          </div>
+          <input
+            value={quickNote}
+            onChange={(e) => setQuickNote(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && quickAdd()}
+            placeholder="What was it? e.g. auto to campus"
+            className="min-w-40 flex-1 rounded-xl border border-line bg-card px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-3"
+            aria-label="What the money was spent on"
+          />
+          <select
+            value={quickCat}
+            onChange={(e) => setQuickCat(e.target.value as CategoryId)}
+            className="cursor-pointer rounded-xl border border-line bg-card px-2 py-2 text-sm text-ink-2 outline-none"
+            aria-label="Category"
+          >
+            {QUICK_CATS.map((c) => (
+              <option key={c} value={c}>
+                {CATEGORY_META[c].label}
+              </option>
+            ))}
+          </select>
+          <Btn onClick={quickAdd} disabled={!parseFloat(quickAmount)}>
+            <Plus className="size-4" aria-hidden /> Add expense
+          </Btn>
+        </div>
+      </motion.div>
 
       {/* stat tiles */}
       <div className="mb-6 grid grid-cols-2 gap-4 xl:grid-cols-4">
@@ -138,15 +214,30 @@ export default function ExpensesPage() {
                 </>
               }
             />
-            <ul className="w-full space-y-1.5" aria-label="Category legend">
+            <ul className="w-full space-y-0.5" aria-label="Category legend — click to see those expenses">
               {byCat.map((s) => (
-                <li key={s.label} className="flex items-center gap-2 text-sm">
-                  <span className="size-2.5 rounded-full" style={{ background: s.color }} aria-hidden />
-                  <span className="flex-1 text-ink-2">{s.label}</span>
-                  <span className="font-medium text-ink">{fmtMoney(s.value)}</span>
+                <li key={s.label}>
+                  <button
+                    onClick={() =>
+                      s.cat !== "other" && setFilterCat(filterCat === s.cat ? null : s.cat)
+                    }
+                    disabled={s.cat === "other"}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-lg px-2 py-1 text-sm transition-colors",
+                      s.cat !== "other" && "cursor-pointer hover:bg-card-hover",
+                      filterCat === s.cat && "bg-accent-soft",
+                    )}
+                  >
+                    <span className="size-2.5 rounded-full" style={{ background: s.color }} aria-hidden />
+                    <span className="flex-1 text-left text-ink-2">{s.label}</span>
+                    <span className="font-medium text-ink">{fmtMoney(s.value)}</span>
+                  </button>
                 </li>
               ))}
             </ul>
+            <p className="w-full text-center text-[11px] text-ink-3">
+              Click a category to see every expense in it →
+            </p>
           </div>
         </GlassCard>
 
@@ -170,16 +261,22 @@ export default function ExpensesPage() {
               const over = spent > amount;
               return (
                 <li key={cat}>
-                  <div className="mb-1 flex items-center gap-2 text-sm">
+                  <button
+                    onClick={() => setFilterCat(filterCat === cat ? null : cat)}
+                    className={cn(
+                      "mb-1 flex w-full cursor-pointer items-center gap-2 rounded-lg text-sm transition-colors hover:bg-card-hover",
+                      filterCat === cat && "bg-accent-soft",
+                    )}
+                  >
                     <span className="flex size-6 items-center justify-center rounded-lg bg-card text-ink-3">
                       <DynIcon name={CATEGORY_META[cat].icon} className="size-3.5" />
                     </span>
-                    <span className="flex-1 text-ink-2">{CATEGORY_META[cat].label}</span>
+                    <span className="flex-1 text-left text-ink-2">{CATEGORY_META[cat].label}</span>
                     <span className={cn("font-medium", over ? "text-bad" : "text-ink")}>
                       {fmtMoney(spent)}
                       <span className="font-normal text-ink-3"> / {fmtMoney(amount)}</span>
                     </span>
-                  </div>
+                  </button>
                   <MeterBar value={spent} max={amount} over={over} color={SERIES[i % SERIES.length]} />
                 </li>
               );
@@ -188,7 +285,37 @@ export default function ExpensesPage() {
         </GlassCard>
 
         <GlassCard className="p-5">
-          <SectionTitle>Recent activity</SectionTitle>
+          <SectionTitle
+            action={
+              <span className="flex items-center gap-1.5 rounded-lg border border-line bg-card px-2 py-1">
+                <Search className="size-3.5 text-ink-3" aria-hidden />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search expenses…"
+                  className="w-32 bg-transparent text-xs text-ink outline-none placeholder:text-ink-3"
+                  aria-label="Search transactions"
+                />
+              </span>
+            }
+          >
+            {filtering ? "Matching expenses" : "Recent activity"}
+          </SectionTitle>
+          {filtering && (
+            <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+              {filterCat && (
+                <button
+                  onClick={() => setFilterCat(null)}
+                  className="flex cursor-pointer items-center gap-1 rounded-full bg-accent-soft px-2.5 py-1 font-medium text-accent transition-colors hover:bg-accent hover:text-accent-ink"
+                >
+                  {CATEGORY_META[filterCat].label} <X className="size-3" aria-hidden />
+                </button>
+              )}
+              <span className="text-ink-3">
+                {visibleTx.length} transaction{visibleTx.length === 1 ? "" : "s"} · {fmtMoney(filteredTotal)} spent
+              </span>
+            </div>
+          )}
           <div className="max-h-[460px] space-y-4 overflow-y-auto pr-1 thin-scroll">
             {recent.map(([date, txs]) => (
               <div key={date}>

@@ -40,6 +40,9 @@ export function toICS(events: CalEvent[]): string {
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//LifeOS//Calendar//EN",
+    "X-WR-CALNAME:LifeOS",
+    "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
+    "X-PUBLISHED-TTL:PT1H",
   ];
   for (const e of events) {
     lines.push("BEGIN:VEVENT");

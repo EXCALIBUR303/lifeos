@@ -38,12 +38,20 @@ interface SettingsState {
   apiKey: string; // Anthropic
   geminiKey: string; // Google AI Studio
   provider: AiProvider;
+  /** Device-pairing code for E2E-encrypted sync ("" = sync off). */
+  syncCode: string;
+  /** Random id for the published calendar feed ("" = never generated). */
+  feedId: string;
+  publishFeed: boolean;
   setName: (name: string) => void;
   setTheme: (theme: ThemeMode) => void;
   setAccent: (accent: AccentId) => void;
   setApiKey: (apiKey: string) => void;
   setGeminiKey: (geminiKey: string) => void;
   setProvider: (provider: AiProvider) => void;
+  setSyncCode: (syncCode: string) => void;
+  setFeedId: (feedId: string) => void;
+  setPublishFeed: (publishFeed: boolean) => void;
 }
 
 export const useSettings = create<SettingsState>()(
@@ -55,12 +63,18 @@ export const useSettings = create<SettingsState>()(
       apiKey: "",
       geminiKey: "",
       provider: "claude",
+      syncCode: "",
+      feedId: "",
+      publishFeed: false,
       setName: (name) => set({ name }),
       setTheme: (theme) => set({ theme }),
       setAccent: (accent) => set({ accent }),
       setApiKey: (apiKey) => set({ apiKey }),
       setGeminiKey: (geminiKey) => set({ geminiKey }),
       setProvider: (provider) => set({ provider }),
+      setSyncCode: (syncCode) => set({ syncCode }),
+      setFeedId: (feedId) => set({ feedId }),
+      setPublishFeed: (publishFeed) => set({ publishFeed }),
     }),
     { name: "lifeos-settings", storage: createJSONStorage(() => localStorage) },
   ),

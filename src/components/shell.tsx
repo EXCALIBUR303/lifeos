@@ -42,6 +42,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { SyncManager } from "./sync";
 import { ProgressRing } from "./ui";
 
 const NAV_GROUPS: {
@@ -149,6 +150,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {showSplash && <Splash hiding={mounted} />}
       {mounted && (
         <div className="mx-auto flex min-h-dvh w-full max-w-[1600px]">
+          <SyncManager />
           <Sidebar onSearch={() => setPaletteOpen(true)} />
           <div className="flex min-w-0 flex-1 flex-col">
             <Topbar onSearch={() => setPaletteOpen(true)} />

@@ -11,7 +11,8 @@ import {
   stagger,
 } from "@/components/ui";
 import { eventsOn, minutesOf, monthGrid, parseICS, toICS } from "@/lib/calendar";
-import { useLife } from "@/lib/store";
+import { useLife, useSettings } from "@/lib/store";
+import { feedUrls, genFeedId } from "@/lib/sync";
 import { CalEvent } from "@/lib/types";
 import {
   addDays,
@@ -28,9 +29,11 @@ import {
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
+  Copy,
   Download,
   MapPin,
   Plus,
+  Smartphone,
   Upload,
   X,
 } from "lucide-react";
@@ -63,7 +66,9 @@ export default function CalendarPage() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [examMode, setExamMode] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);
+  const [feedCopied, setFeedCopied] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const { publishFeed, setPublishFeed, feedId, setFeedId } = useSettings();
 
   const anchorDate = fromISO(anchor);
   // week starts Monday
@@ -215,6 +220,79 @@ export default function CalendarPage() {
           {importMsg}
         </motion.p>
       )}
+
+      {/* Apple Calendar subscription feed */}
+      <motion.div variants={fadeUp} className="glass mb-4 rounded-2xl p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="flex size-9 items-center justify-center rounded-xl bg-accent-soft text-accent">
+            <Smartphone className="size-4" aria-hidden />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-ink">
+              iPhone & Mac Calendar sync
+            </span>
+            <span className="text-xs text-ink-3">
+              Publishes a private feed Apple Calendar subscribes to — imported timetables
+              and new events appear there automatically.
+            </span>
+          </span>
+          <button
+            role="switch"
+            aria-checked={publishFeed}
+            aria-label="Publish calendar feed"
+            onClick={() => {
+              if (!publishFeed && !feedId) setFeedId(genFeedId());
+              setPublishFeed(!publishFeed);
+            }}
+            className={cn(
+              "relative h-7 w-12 cursor-pointer rounded-full transition-colors",
+              publishFeed ? "bg-accent" : "bg-line-strong",
+            )}
+          >
+            <span
+              className={cn(
+                "absolute top-1 size-5 rounded-full bg-white shadow transition-all",
+                publishFeed ? "left-6" : "left-1",
+              )}
+              aria-hidden
+            />
+          </button>
+        </div>
+
+        {publishFeed && feedId && (
+          <div className="mt-4 border-t border-line pt-4">
+            <div className="flex max-w-2xl flex-wrap items-center gap-2">
+              <code className="min-w-0 flex-1 truncate rounded-xl border border-line bg-card px-3 py-2 font-mono text-xs text-ink">
+                {feedUrls(feedId).webcal}
+              </code>
+              <Btn
+                variant="soft"
+                onClick={() => {
+                  navigator.clipboard.writeText(feedUrls(feedId).webcal);
+                  setFeedCopied(true);
+                  setTimeout(() => setFeedCopied(false), 1600);
+                }}
+              >
+                <Copy className="size-4" aria-hidden /> {feedCopied ? "Copied!" : "Copy link"}
+              </Btn>
+            </div>
+            <ul className="mt-3 space-y-1 text-xs leading-relaxed text-ink-3">
+              <li>
+                <strong className="text-ink-2">iPhone:</strong> open this link in Safari → Subscribe, or
+                Settings → Apps → Calendar → Calendar Accounts → Add Subscribed Calendar.
+              </li>
+              <li>
+                <strong className="text-ink-2">Mac:</strong> Calendar app → File → New Calendar Subscription → paste the link.
+              </li>
+              <li>
+                Apple refreshes subscribed calendars periodically (set it to hourly when subscribing).
+                The link is unguessable but not encrypted — it shares event titles/times only. Turn the
+                switch off to stop publishing.
+              </li>
+            </ul>
+          </div>
+        )}
+      </motion.div>
 
       {/* exam banner */}
       {examMode && upcomingExams.length > 0 && (
