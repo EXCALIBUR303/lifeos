@@ -29,7 +29,16 @@ import {
   todayISO,
 } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowDownLeft, ArrowUpRight, Plus, Search, Trash2, X } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useState } from "react";
 
 const SERIES = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)"];
@@ -40,8 +49,15 @@ const QUICK_CATS: CategoryId[] = [
 ];
 
 export default function ExpensesPage() {
-  const { transactions, budgets, addTransaction, deleteTransaction } = useLife();
+  const {
+    transactions, budgets, addTransaction, deleteTransaction,
+    clearTransactions, setBudget,
+  } = useLife();
   const [adding, setAdding] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [editBudgets, setEditBudgets] = useState(false);
+  const [newBudgetCat, setNewBudgetCat] = useState<CategoryId>("food");
+  const [newBudgetAmt, setNewBudgetAmt] = useState("");
   const [quickAmount, setQuickAmount] = useState("");
   const [quickNote, setQuickNote] = useState("");
   const [quickCat, setQuickCat] = useState<CategoryId>("food");
@@ -135,9 +151,36 @@ export default function ExpensesPage() {
         accent="flows"
         subtitle="Every rupee accounted for — spending, income, budgets and the patterns between them."
         actions={
-          <Btn onClick={() => setAdding(true)}>
-            <Plus className="size-4" aria-hidden /> Add transaction
-          </Btn>
+          confirmClear ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-ink-3">
+                Delete all {transactions.length} transactions? Budgets stay.
+              </span>
+              <Btn
+                variant="danger"
+                onClick={() => {
+                  clearTransactions();
+                  setFilterCat(null);
+                  setSearch("");
+                  setConfirmClear(false);
+                }}
+              >
+                Yes, start from zero
+              </Btn>
+              <Btn variant="ghost" onClick={() => setConfirmClear(false)}>
+                Cancel
+              </Btn>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Btn variant="ghost" onClick={() => setConfirmClear(true)}>
+                <RotateCcw className="size-4" aria-hidden /> Reset
+              </Btn>
+              <Btn onClick={() => setAdding(true)}>
+                <Plus className="size-4" aria-hidden /> Add transaction
+              </Btn>
+            </div>
+          )
         }
       />
 
@@ -204,7 +247,12 @@ export default function ExpensesPage() {
       <div className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-12">
         <GlassCard className="p-5 xl:col-span-4">
           <SectionTitle>By category</SectionTitle>
-          <div className="flex flex-col items-center gap-4">
+          {byCat.length === 0 && (
+            <p className="rounded-xl border border-dashed border-line py-10 text-center text-sm text-ink-3">
+              Nothing this month yet — your breakdown appears as you add expenses above.
+            </p>
+          )}
+          <div className={cn("flex flex-col items-center gap-4", byCat.length === 0 && "hidden")}>
             <Donut
               slices={byCat}
               center={
@@ -254,29 +302,120 @@ export default function ExpensesPage() {
       {/* budgets + transactions */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <GlassCard className="p-5">
-          <SectionTitle>Budgets</SectionTitle>
+          <SectionTitle
+            action={
+              <button
+                onClick={() => setEditBudgets((e) => !e)}
+                className={cn(
+                  "flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition-colors",
+                  editBudgets ? "bg-accent-soft text-accent" : "text-ink-3 hover:text-ink",
+                )}
+              >
+                <Pencil className="size-3.5" aria-hidden />
+                {editBudgets ? "Done" : "Edit"}
+              </button>
+            }
+          >
+            Budgets
+          </SectionTitle>
+
+          {editBudgets && (
+            <div className="mb-4 rounded-xl border border-line bg-card p-3">
+              <p className="mb-2 text-xs font-medium text-ink-2">Add a monthly cap</p>
+              <div className="flex flex-wrap gap-2">
+                <select
+                  value={newBudgetCat}
+                  onChange={(e) => setNewBudgetCat(e.target.value as CategoryId)}
+                  className="cursor-pointer rounded-lg border border-line bg-card px-2 py-1.5 text-sm text-ink-2 outline-none"
+                  aria-label="Budget category"
+                >
+                  {QUICK_CATS.filter((c) => budgets[c] === undefined).map((c) => (
+                    <option key={c} value={c}>
+                      {CATEGORY_META[c].label}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  value={newBudgetAmt}
+                  onChange={(e) => setNewBudgetAmt(e.target.value.replace(/[^\d]/g, ""))}
+                  inputMode="numeric"
+                  placeholder="₹ per month"
+                  className="w-28 rounded-lg border border-line bg-card px-2 py-1.5 text-sm text-ink outline-none placeholder:text-ink-3"
+                  aria-label="Budget amount"
+                />
+                <Btn
+                  variant="soft"
+                  disabled={!parseInt(newBudgetAmt) || budgets[newBudgetCat] !== undefined}
+                  onClick={() => {
+                    setBudget(newBudgetCat, parseInt(newBudgetAmt));
+                    setNewBudgetAmt("");
+                  }}
+                >
+                  <Plus className="size-4" aria-hidden /> Add
+                </Btn>
+              </div>
+            </div>
+          )}
+
+          {budgetRows.length === 0 && !editBudgets && (
+            <p className="rounded-xl border border-dashed border-line py-8 text-center text-sm text-ink-3">
+              No budgets yet — hit Edit to set monthly caps per category.
+            </p>
+          )}
+
           <ul className="space-y-3.5">
             {budgetRows.map(([cat, amount], i) => {
               const spent = monthSpend(transactions, mk, cat);
               const over = spent > amount;
               return (
                 <li key={cat}>
-                  <button
-                    onClick={() => setFilterCat(filterCat === cat ? null : cat)}
-                    className={cn(
-                      "mb-1 flex w-full cursor-pointer items-center gap-2 rounded-lg text-sm transition-colors hover:bg-card-hover",
-                      filterCat === cat && "bg-accent-soft",
-                    )}
-                  >
-                    <span className="flex size-6 items-center justify-center rounded-lg bg-card text-ink-3">
-                      <DynIcon name={CATEGORY_META[cat].icon} className="size-3.5" />
-                    </span>
-                    <span className="flex-1 text-left text-ink-2">{CATEGORY_META[cat].label}</span>
-                    <span className={cn("font-medium", over ? "text-bad" : "text-ink")}>
-                      {fmtMoney(spent)}
-                      <span className="font-normal text-ink-3"> / {fmtMoney(amount)}</span>
-                    </span>
-                  </button>
+                  {editBudgets ? (
+                    <div className="mb-1 flex w-full items-center gap-2 text-sm">
+                      <span className="flex size-6 items-center justify-center rounded-lg bg-card text-ink-3">
+                        <DynIcon name={CATEGORY_META[cat].icon} className="size-3.5" />
+                      </span>
+                      <span className="flex-1 text-left text-ink-2">{CATEGORY_META[cat].label}</span>
+                      <span className="flex items-center gap-1 rounded-lg border border-line bg-card px-2 py-1">
+                        <span className="text-xs text-ink-3">₹</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step={500}
+                          value={amount}
+                          onChange={(e) => {
+                            const v = parseInt(e.target.value);
+                            if (!Number.isNaN(v) && v > 0) setBudget(cat, v);
+                          }}
+                          className="w-20 bg-transparent text-sm font-medium text-ink outline-none"
+                          aria-label={`Monthly budget for ${CATEGORY_META[cat].label}`}
+                        />
+                      </span>
+                      <button
+                        aria-label={`Remove ${CATEGORY_META[cat].label} budget`}
+                        onClick={() => setBudget(cat, 0)}
+                        className="cursor-pointer rounded-lg p-1.5 text-ink-3 transition-colors hover:text-bad"
+                      >
+                        <X className="size-4" aria-hidden />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setFilterCat(filterCat === cat ? null : cat)}
+                      className={cn(
+                        "mb-1 flex w-full cursor-pointer items-center gap-2 rounded-lg text-sm transition-colors hover:bg-card-hover",
+                        filterCat === cat && "bg-accent-soft",
+                      )}
+                    >
+                      <span className="flex size-6 items-center justify-center rounded-lg bg-card text-ink-3">
+                        <DynIcon name={CATEGORY_META[cat].icon} className="size-3.5" />
+                      </span>
+                      <span className="flex-1 text-left text-ink-2">{CATEGORY_META[cat].label}</span>
+                      <span className={cn("font-medium", over ? "text-bad" : "text-ink")}>
+                        {fmtMoney(spent)}
+                        <span className="font-normal text-ink-3"> / {fmtMoney(amount)}</span>
+                      </span>
+                    </button>
+                  )}
                   <MeterBar value={spent} max={amount} over={over} color={SERIES[i % SERIES.length]} />
                 </li>
               );
@@ -317,6 +456,13 @@ export default function ExpensesPage() {
             </div>
           )}
           <div className="max-h-[460px] space-y-4 overflow-y-auto pr-1 thin-scroll">
+            {recent.length === 0 && (
+              <p className="rounded-xl border border-dashed border-line py-10 text-center text-sm text-ink-3">
+                {filtering
+                  ? "No transactions match."
+                  : "No transactions yet — log your first expense with the bar above."}
+              </p>
+            )}
             {recent.map(([date, txs]) => (
               <div key={date}>
                 <p className="mb-1.5 text-xs font-medium text-ink-3">{relativeDay(date) === prettyDate(date) ? prettyDate(date) : relativeDay(date)}</p>

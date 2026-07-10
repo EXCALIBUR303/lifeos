@@ -108,6 +108,9 @@ interface LifeState extends SeedData {
     note: string;
   }) => void;
   deleteTransaction: (id: string) => void;
+  /** Wipes every transaction — the "make money fully manual" reset. */
+  clearTransactions: () => void;
+  /** Sets a monthly cap; amount <= 0 removes the budget entirely. */
   setBudget: (category: CategoryId, amount: number) => void;
 
   addGoal: (g: {
@@ -155,7 +158,10 @@ interface LifeState extends SeedData {
 
   chat: ChatMsg[];
 
+  /** Back to the guided demo data. */
   resetAll: () => void;
+  /** Blank slate — every module empty, fully manual from here. */
+  resetEmpty: () => void;
 }
 
 export const useLife = create<LifeState>()(
@@ -227,10 +233,14 @@ export const useLife = create<LifeState>()(
         set((s) => ({
           transactions: s.transactions.filter((t) => t.id !== id),
         })),
+      clearTransactions: () => set({ transactions: [] }),
       setBudget: (category, amount) =>
-        set((s) => ({
-          budgets: { ...s.budgets, [category]: amount } as Budgets,
-        })),
+        set((s) => {
+          const budgets: Budgets = { ...s.budgets };
+          if (amount > 0) budgets[category] = amount;
+          else delete budgets[category];
+          return { budgets };
+        }),
 
       addGoal: (g) =>
         set((s) => ({
@@ -371,6 +381,22 @@ export const useLife = create<LifeState>()(
       clearChat: () => set({ chat: [] }),
 
       resetAll: () => set({ ...seed(), chat: [] }),
+      resetEmpty: () =>
+        set({
+          tasks: [],
+          habits: [],
+          transactions: [],
+          budgets: {},
+          goals: [],
+          journal: [],
+          health: {},
+          focus: [],
+          events: [],
+          subjects: [],
+          flashcards: [],
+          notes: [],
+          chat: [],
+        }),
     }),
     {
       name: "lifeos-data",

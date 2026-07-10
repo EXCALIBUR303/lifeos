@@ -46,7 +46,7 @@ export default function SettingsPage() {
   } = useSettings();
   const life = useLife();
   const syncStatus = useSyncStatus();
-  const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmReset, setConfirmReset] = useState<null | "demo" | "empty">(null);
   const [joinCode, setJoinCode] = useState("");
   const [copied, setCopied] = useState(false);
 
@@ -342,20 +342,28 @@ export default function SettingsPage() {
                 <Btn
                   variant="danger"
                   onClick={() => {
-                    life.resetAll();
-                    setConfirmReset(false);
+                    if (confirmReset === "empty") life.resetEmpty();
+                    else life.resetAll();
+                    setConfirmReset(null);
                   }}
                 >
-                  Yes, reset everything
+                  {confirmReset === "empty"
+                    ? "Yes, wipe everything — start blank"
+                    : "Yes, load the demo data"}
                 </Btn>
-                <Btn variant="ghost" onClick={() => setConfirmReset(false)}>
+                <Btn variant="ghost" onClick={() => setConfirmReset(null)}>
                   Cancel
                 </Btn>
               </>
             ) : (
-              <Btn variant="ghost" onClick={() => setConfirmReset(true)}>
-                <RotateCcw className="size-4" aria-hidden /> Reset to demo data
-              </Btn>
+              <>
+                <Btn variant="ghost" onClick={() => setConfirmReset("empty")}>
+                  <RotateCcw className="size-4" aria-hidden /> Start fresh (empty)
+                </Btn>
+                <Btn variant="ghost" onClick={() => setConfirmReset("demo")}>
+                  Reset to demo data
+                </Btn>
+              </>
             )}
           </div>
         </GlassCard>
