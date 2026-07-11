@@ -139,6 +139,11 @@ export default function Dashboard() {
             <Sparkles className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
             <span>{brief}</span>
           </p>
+          <p className="mt-2 text-xs text-ink-3">
+            <kbd className="rounded-md border border-line px-1.5 py-0.5 text-[10px] font-medium">⌘K</kbd>{" "}
+            captures anything — “spent 250 on chai” · “slept 7.5” · “class ML monday 2pm” — and files
+            it in the right place.
+          </p>
         </div>
         <div className="flex items-center gap-4">
           <ProgressRing value={score / 100} size={92} stroke={7} label={

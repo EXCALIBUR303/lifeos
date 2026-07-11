@@ -1,9 +1,9 @@
 "use client";
 
+import { CaptureKind, parseCapture } from "@/lib/capture";
 import { insights, lifeScore } from "@/lib/insights";
-import { parseTask } from "@/lib/nlp";
 import { ThemeMode, useLife, useSettings } from "@/lib/store";
-import { cn, prettyDate, relativeDay, todayISO } from "@/lib/utils";
+import { cn, prettyDate, todayISO } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
@@ -13,15 +13,17 @@ import {
   Command,
   CornerDownLeft,
   Droplets,
+  Dumbbell,
   Film,
+  Footprints,
   GraduationCap,
   HeartPulse,
+  Layers,
   LayoutDashboard,
   LayoutGrid,
   Moon,
   MoonStar,
   NotebookPen,
-  Plus,
   Repeat,
   Search,
   Settings,
@@ -449,20 +451,34 @@ function CommandPalette({
   );
 }
 
+const CAPTURE_ICONS: Record<CaptureKind, typeof Wallet> = {
+  expense: Wallet,
+  income: Wallet,
+  water: Droplets,
+  sleep: Moon,
+  steps: Footprints,
+  workout: Dumbbell,
+  habit: Repeat,
+  note: StickyNote,
+  journal: NotebookPen,
+  event: CalendarDays,
+  card: Layers,
+  task: CheckCircle2,
+};
+
 // Mounted fresh each time the palette opens, so query/selection state needs no reset.
 function PaletteInner({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [selRaw, setSel] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  const addTask = useLife((s) => s.addTask);
   const logHealth = useLife((s) => s.logHealth);
   const health = useLife((s) => s.health);
   const life = useLife();
   const setTheme = useSettings((s) => s.setTheme);
   const smartInsights = useMemo(() => insights(life), [life]);
 
-  const parsed = useMemo(() => (q.trim() ? parseTask(q) : null), [q]);
+  const capture = useMemo(() => (q.trim() ? parseCapture(q) : null), [q]);
 
   const actions: Action[] = useMemo(() => {
     const base: Action[] = [
@@ -512,28 +528,22 @@ function PaletteInner({ onClose }: { onClose: () => void }) {
       ? base.filter((a) => a.label.toLowerCase().includes(needle))
       : base;
 
-    // natural-language quick add always available when typing
-    if (parsed && parsed.title) {
+    // universal capture — anything you type becomes data in the right module
+    if (capture) {
+      const CaptureIcon = CAPTURE_ICONS[capture.kind];
       filtered.unshift({
-        id: "quick-add",
-        label: `Add task “${parsed.title}”`,
-        hint: [
-          parsed.due && relativeDay(parsed.due),
-          parsed.dueTime,
-          parsed.priority !== "medium" && parsed.priority,
-          ...parsed.tags.map((t) => `#${t}`),
-        ]
-          .filter(Boolean)
-          .join(" · "),
-        icon: <Plus className="size-4" aria-hidden />,
+        id: "capture",
+        label: capture.label,
+        hint: capture.hint,
+        icon: <CaptureIcon className="size-4" aria-hidden />,
         run: () => {
-          addTask(parsed);
-          router.push("/tasks");
+          capture.apply();
+          router.push(capture.dest);
         },
       });
     }
     return filtered;
-  }, [q, parsed, router, addTask, logHealth, health, setTheme]);
+  }, [q, capture, router, logHealth, health, setTheme]);
 
   const sel = Math.max(0, Math.min(selRaw, actions.length - 1));
 
@@ -582,7 +592,7 @@ function PaletteInner({ onClose }: { onClose: () => void }) {
                   }
                   if (e.key === "Enter" && actions[sel]) runAction(actions[sel]);
                 }}
-                placeholder="Search, or type “submit report next friday at 9 #college”…"
+                placeholder="Try “spent 250 on chai” · “slept 7.5” · “meditate” · “note: …”"
                 className="flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-3"
                 aria-label="Command input"
               />
